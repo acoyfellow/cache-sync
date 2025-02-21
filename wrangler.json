@@ -1,0 +1,32 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cache-sync",
+  "main": "./worker/server.ts",
+  "compatibility_date": "2025-02-04",
+  "assets": {
+    "directory": "./public"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "UserProfileCache",
+        "class_name": "UserProfileCache"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": [
+        "UserProfileCache"
+      ]
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
