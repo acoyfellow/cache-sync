@@ -78,7 +78,7 @@
       <h1 class="text-4xl font-bold flex items-center gap-2 justify-between">
         <span>Sync & Cache Pattern</span>
         <a
-          href="https://github.com/coeyman/cache-sync"
+          href="https://github.com/acoyfellow/cache-sync"
           class="text-neutral-500 hover:text-neutral-700 transition-colors"
         >
           <img src="/github.svg" class="w-8 h-8" alt="View on GitHub" />
