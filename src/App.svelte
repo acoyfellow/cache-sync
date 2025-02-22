@@ -75,20 +75,25 @@
 <main class="min-h-screen bg-neutral-50 py-8">
   <div class="container px-4 max-w-2xl mx-auto">
     <section class="border-b pb-6 border-neutral-200 space-y-4 mb-8">
-      <h1 class="text-4xl font-bold flex items-center gap-2 justify-between">
-        <span>Sync & Cache Pattern</span>
+      <div class="flex items-center justify-between gap-2">
+        <h1
+          class="text-2xl md:text-4xl font-bold flex items-center gap-2 justify-between"
+        >
+          <a href="/">🔄</a>
+          <span>Sync & Cache</span>
+        </h1>
         <a
           href="https://github.com/acoyfellow/cache-sync"
           class="text-neutral-500 hover:text-neutral-700 transition-colors"
         >
           <img src="/github.svg" class="w-8 h-8" alt="View on GitHub" />
         </a>
-      </h1>
+      </div>
 
       <p class="text-lg text-neutral-600">
         This pattern is designed for applications with high read/write traffic,
         offering a scalable and low-latency caching solution using Cloudflare
-        Durable Objects.
+        Workers & Durable Objects.
       </p>
     </section>
 
@@ -97,7 +102,7 @@
       <div class="flex gap-3">
         {#each demoIds as id}
           <button
-            class="px-5 py-2.5 rounded-lg border shadow-sm transition-all {selectedId ===
+            class="px-5 py-2.5 rounded-lg border shadow-sm cursor-pointer transition-all {selectedId ===
             id
               ? 'bg-orange-500 text-white border-orange-600'
               : 'bg-white hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow'}"
@@ -153,7 +158,7 @@
           </div>
 
           <button
-            class="w-full px-5 py-2.5 rounded-lg bg-orange-500 text-white font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:shadow hover:bg-orange-600 focus:ring-2 focus:ring-orange-500/20"
+            class="w-full px-5 py-2.5 rounded-lg bg-orange-500 text-white font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:shadow hover:bg-orange-600 focus:ring-2 focus:ring-orange-500/20 cursor-pointer"
             onclick={() =>
               updateProfile({
                 ...profile,
