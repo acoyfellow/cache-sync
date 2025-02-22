@@ -13,7 +13,7 @@
   "durable_objects": {
     "bindings": [
       {
-        "name": "UserProfileCache",
+        "name": "userprofile",
         "class_name": "UserProfileCache"
       }
     ]

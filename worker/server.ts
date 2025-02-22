@@ -1,7 +1,8 @@
 import { Server, type Connection, routePartykitRequest } from "partyserver"
 import { DurableObjectNamespace, DurableObjectStorage, DurableObjectState } from "@cloudflare/workers-types"
 
-type UserProfile = {
+// Rename TYPE to avoid conflict
+type UserProfileData = {
   id: string
   data: any
   lastUpdated: number
@@ -12,135 +13,83 @@ type Env = {
   DATABASE_URL: string // Your main database connection
 }
 
+// Single DO class that creates one instance per user
 export class UserProfileCache extends Server<Env> {
-  declare broadcast: (message: string) => void;
-
-  private storage: DurableObjectStorage
-  private readonly SYNC_INTERVAL = 60_000 // 60 seconds in ms
+  private readonly TTL = 86_400_000 // 24h
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env)
-    this.storage = state.storage
-    state.blockConcurrencyWhile(() => this.initialize())
+    // Each DO instance is created for a specific user
+    state.storage.setAlarm(Date.now() + this.TTL)
   }
 
-  private initialize = async () => {
-    await this.processPendingUpdates()
-  }
-
-  async onConnect(conn: Connection) {
-    conn.send(JSON.stringify({
-      type: 'profile',
-      data: await this.getProfile(conn.id)
-    }))
-  }
-
+  // Unified message handler
   async onMessage(conn: Connection, message: string) {
-    const { type, profile, userId } = JSON.parse(message)
+    const { type, userId, profile } = JSON.parse(message);
 
     switch (type) {
-      case 'update_profile':
-        await this.cacheAndQueueUpdate(profile)
-        break
-
-      case 'get_profile':
+      case 'get':
+        const data = await this.ctx.storage.get<Uint8Array>(userId);
         conn.send(JSON.stringify({
-          type: 'profile',
-          data: await this.getProfile(userId)
-        }))
-        break
+          type: "profile",
+          data: data ? await this.decompress(data) : this.createStub()
+        }));
+        break;
+
+      case 'update':
+        const compressed = await this.compress(profile);
+        await this.ctx.storage.put(userId, compressed);
+        this.broadcast(JSON.stringify({
+          type: "profile_updated",
+          profile: profile
+        }));
+        break;
     }
   }
 
-  // Shared compression utilities
-  private async compress(data: unknown): Promise<Uint8Array> {
-    const stream = new Blob([JSON.stringify(data)]).stream()
-      .pipeThrough(new CompressionStream('gzip'));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
-  }
-
-  private async decompress(buffer: Uint8Array): Promise<unknown> {
-    const stream = new Blob([buffer]).stream()
-      .pipeThrough(new DecompressionStream('gzip'));
-    return JSON.parse(await new Response(stream).text());
-  }
-
-  private async getProfile(userId: string): Promise<UserProfile> {
-    const buffer = await this.storage.get<Uint8Array>(userId);
-    const profile = buffer ? await this.decompress(buffer) as UserProfile : null;
-
-    return profile ?? this.createStubProfile(userId);
-  }
-
-  private createStubProfile(userId: string): UserProfile {
-    return {
-      id: userId,
-      data: { name: 'New User', email: '' },
-      lastUpdated: Date.now()
-    }
-  }
-
-  private async cacheAndQueueUpdate(profile: UserProfile) {
-    // Store compressed version in main cache
-    await this.storage.put(profile.id, await this.compress(profile));
-
-    // Store uncompressed version in pending queue for DB sync
-    await this.storage.put(`pending_${Date.now()}`, {
-      ...profile,
-      lastUpdated: Date.now()
-    });
-
-    // Schedule sync if needed
-    if (!(await this.storage.getAlarm())) {
-      await this.storage.setAlarm(Date.now() + this.SYNC_INTERVAL);
-    }
-
-    this.broadcast(JSON.stringify({
-      type: 'profile_updated',
-      profile
-    }));
-  }
-
+  // Batch sync with main DB
   async alarm() {
-    await this.processPendingUpdates()
-  }
+    const pending = await this.ctx.storage.list({ prefix: 'pending_' })
+    const updates = [...pending.values()].map(buf => this.decompress(buf))
 
-  private async processPendingUpdates() {
-    const pendingUpdates = await this.storage.list({ prefix: 'pending_' });
-
-    if (pendingUpdates.size > 0) {
-      console.log(`🔄 Syncing ${pendingUpdates.size} updates (mock DB call)`);
-
-      // Simulate occasional sync failures
-      if (Math.random() < 0.2) { // 20% failure rate
-        console.error('❌ Mock DB sync failed - retrying later');
-        throw new Error('Mock DB failure');
-      }
-
-      // Simulate successful sync
-      await new Promise(r => setTimeout(r, 500));
-      console.log('✅ Mock database sync completed');
-
-      // Clear processed updates
-      await Promise.all(
-        [...pendingUpdates.keys()].map(key => this.storage.delete(key))
-      )
+    if (updates.length > 0) {
+      await new Promise(resolve => setTimeout(resolve, 200))
+      // TODO: Uncomment this when we have a main database
+      // await fetch(this.env.DATABASE_URL, {
+      //   method: 'PUT',
+      //   body: JSON.stringify({ updates })
+      // })
+      await this.ctx.storage.delete([...pending.keys()])
     }
 
-    // Reschedule if more updates exist
-    if ((await this.storage.list({ prefix: 'pending_' })).size > 0) {
-      await this.storage.setAlarm(Date.now() + this.SYNC_INTERVAL)
+    await this.ctx.storage.setAlarm(Date.now() + this.TTL)
+  }
+
+  // Compression utilities
+  private async compress(data: UserProfileData) {
+    const stream = new Blob([JSON.stringify(data)]).stream()
+      .pipeThrough(new CompressionStream('gzip'))
+    return new Uint8Array(await new Response(stream).arrayBuffer())
+  }
+
+  private async decompress(buffer: Uint8Array) {
+    const stream = new Blob([buffer]).stream()
+      .pipeThrough(new DecompressionStream('gzip'))
+    return JSON.parse(await new Response(stream).text()) as UserProfileData
+  }
+
+  private createStub() {
+    return {
+      id: 'New User',
+      data: { name: 'New User' }
     }
   }
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    return (
-      (await routePartykitRequest(request, env)) ||
-      new Response("Not found", {
-        status: 404,
-      })
-    )
-  },
+  async fetch(request: Request, env: Env) {
+    return await routePartykitRequest(request, env, {
+      userprofile: UserProfileCache as unknown as PartyServer
+    }) || new Response("Not found", { status: 404 })
+  }
 } satisfies ExportedHandler<Env>

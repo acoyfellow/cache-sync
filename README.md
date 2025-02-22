@@ -80,14 +80,14 @@ bunx wrangler deploy
 
 1. **Read Path**:
 ```plaintext
-Client → Worker → Durable Object Cache
-                ↳ (Cache Miss) → Main DB → Cache Population
+Client → Worker → Dedicated User DO Instance (Isolated per session)
+                ↳ (Cache Miss) → Create New DO Instance → Return Stub
 ```
 
 2. **Write Path**:
 ```plaintext
-Client → Durable Object Cache → In-Memory Buffer
-                               ↳ Alarm → Batch DB Write
+Client → Dedicated User DO Instance → In-Memory State + Storage
+                               ↳ Alarm → Batch Sync to Main DB
 ```
 
 3. **Client Sync**:
@@ -119,23 +119,13 @@ This implements a robust offline-first pattern where:
 This maintains security while allowing gradual rollout. The key is keeping the cache layer as a transparent proxy that enforces existing auth rules.
 
 
-## Furure Concerns
+## Future Concerns
 
-  1) Data Compression
-    - Why? So we can store more data in the local DO state.
-
-  2) TTL Expiration
-    - Why? So we can expire data that is no longer needed.
-
-  3) Rate Limiting
-    - Why? So we can prevent abuse.
-
-  4) Authentication
-    - Why? So we can authenticate requests.
-
-  5) Monitoring & Observability
-    - Why? So we can monitor the performance of the cache.
-
+- [x] **Data Compression** - Store more data in Durable Object state  
+- [ ] **TTL Expiration** - Automatically expire stale data
+- [ ] **Rate Limiting** - Prevent API abuse
+- [ ] **Auth Integration** - Add request validation
+- [ ] **Metrics Dashboard** - Track cache performance
 
 ## License
 

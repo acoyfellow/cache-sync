@@ -11,15 +11,16 @@
   let socket = new PartySocket({
     host: window.location.host,
     room: userId,
-    party: "user-profile-cache",
+    party: "userprofile",
+    path: `parties/userprofile/${userId}`,
   });
 
   let offlineQueue = $state<Array<Partial<typeof profile>>>([]);
   let isOnline = $state(navigator.onLine);
   let persistedProfile = localStorage.getItem(`profile-${userId}`);
   let profile = $state(persistedProfile ? JSON.parse(persistedProfile) : null);
-
   let connecting = $state(true);
+  let showSuccess = $state(false);
 
   $effect(() => {
     // Reconnect when ID changes
@@ -30,7 +31,8 @@
     const newSocket = new PartySocket({
       host: window.location.host,
       room: selectedId,
-      party: "user-profile-cache",
+      party: "userprofile",
+      path: `parties/userprofile/${selectedId}`,
     });
 
     socket = newSocket;
@@ -46,7 +48,7 @@
       connecting = false;
       socket.send(
         JSON.stringify({
-          type: "get_profile",
+          type: "get",
           userId: selectedId,
         }),
       );
@@ -70,7 +72,7 @@
       offlineQueue.forEach((update) => {
         socket.send(
           JSON.stringify({
-            type: "update_profile",
+            type: "update",
             profile: { ...profile, ...update },
           }),
         );
@@ -99,6 +101,8 @@
         break;
       case "profile_updated":
         profile = data.profile;
+        showSuccess = true;
+        setTimeout(() => (showSuccess = false), 2000);
         break;
     }
   }
@@ -107,8 +111,13 @@
     if (isOnline) {
       socket.send(
         JSON.stringify({
-          type: "update_profile",
-          profile: { ...profile, ...updates },
+          type: "update",
+          userId: selectedId,
+          profile: {
+            ...profile,
+            ...updates,
+            lastUpdated: new Date().toISOString(),
+          },
         }),
       );
     } else {
@@ -123,7 +132,7 @@
     <section class="border-b pb-6 border-neutral-200 space-y-4 mb-8">
       <div class="flex items-center justify-between gap-2">
         <h1
-          class="text-2xl md:text-4xl font-bold flex items-center gap-2 justify-between"
+          class="text-2xl md:text-3xl font-bold flex items-center gap-2 justify-between"
         >
           <a href="/">🔄</a>
           <span>Sync & Cache</span>
@@ -148,10 +157,10 @@
       <div class="flex gap-3">
         {#each demoIds as id}
           <button
-            class="px-5 py-2.5 rounded-lg border shadow-sm cursor-pointer transition-all {selectedId ===
+            class="px-5 py-2.5 rounded-lg border hover:-translate-y-0.5 hover:shadow cursor-pointer transition-all {selectedId ===
             id
-              ? 'bg-orange-500 text-white border-orange-600'
-              : 'bg-white hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow'}"
+              ? 'bg-orange-500 text-white border-orange-600 hover:bg-orange-600'
+              : 'bg-white hover:bg-neutral-50 border-neutral-200 hover:-translate-y-0.5 hover:shadow '}"
             onclick={() => (selectedId = id)}
           >
             {id}
@@ -161,9 +170,18 @@
     </div>
 
     <div
-      class="bg-white rounded-xl shadow-md p-8"
+      class="bg-white rounded-xl p-8 relative border border-neutral-200"
       in:fly={{ y: 20, duration: 300 }}
     >
+      {#if showSuccess}
+        <div
+          class="absolute top-4 right-4 bg-green-100 text-green-800 px-4 py-2 rounded-md"
+          in:fade={{ duration: 200 }}
+          out:fade={{ duration: 200 }}
+        >
+          ✓ Profile updated successfully
+        </div>
+      {/if}
       {#if connecting}
         <div class="text-center py-12 min-h-60" in:fade={{ duration: 200 }}>
           <div
@@ -174,7 +192,17 @@
           <p class="mt-4 text-neutral-600">Connecting to {selectedId}...</p>
         </div>
       {:else if profile}
-        <div class="space-y-6 min-h-60" in:fade={{ duration: 200 }}>
+        <form
+          class="space-y-6 min-h-60"
+          in:fade={{ duration: 200 }}
+          onsubmit={(e: Event) => {
+            e.preventDefault();
+            updateProfile({
+              ...profile,
+              lastUpdated: new Date().toISOString(),
+            });
+          }}
+        >
           <div class="space-y-4">
             <div class="space-y-2">
               <label
@@ -184,7 +212,7 @@
               <input
                 id="name"
                 type="text"
-                class="w-full px-4 py-2.5 rounded-lg border border-neutral-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                class="w-full px-4 py-2.5 rounded-lg border border-neutral-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all focus:outline-none"
                 bind:value={profile.data.name}
               />
             </div>
@@ -197,19 +225,15 @@
               <input
                 id="email"
                 type="email"
-                class="w-full px-4 py-2.5 rounded-lg border border-neutral-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                class="w-full px-4 py-2.5 rounded-lg border border-neutral-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all focus:outline-none"
                 bind:value={profile.data.email}
               />
             </div>
           </div>
 
           <button
-            class="w-full px-5 py-2.5 rounded-lg bg-orange-500 text-white font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:shadow hover:bg-orange-600 focus:ring-2 focus:ring-orange-500/20 cursor-pointer"
-            onclick={() =>
-              updateProfile({
-                ...profile,
-                lastUpdated: new Date().toISOString(),
-              })}
+            class="w-full px-5 py-2.5 rounded-lg bg-orange-500 text-white font-medium transition-all hover:-translate-y-0.5 hover:shadow hover:bg-orange-600 focus:ring-2 focus:ring-orange-500/20 cursor-pointer"
+            type="submit"
             aria-disabled={!profile}
             disabled={!profile}
           >
@@ -218,18 +242,20 @@
 
           <p class="text-sm text-neutral-500">
             Last Updated: {new Date(profile.lastUpdated).toLocaleString()}
+            <br />
+            Open
+            <a
+              href="/?userId={selectedId}"
+              target="_blank"
+              class="text-orange-500 hover:text-orange-600 transition-colors underline-offset-2 underline"
+              >multiple tabs/windows</a
+            >
+            with the same user ID to see real-time sync.
+            <br />
+            Current User ID: {selectedId}
           </p>
-        </div>
+        </form>
       {/if}
-    </div>
-
-    <div
-      class="mt-8 p-4 bg-orange-50 rounded-lg text-sm text-neutral-600 space-y-2"
-    >
-      <p>
-        Open multiple tabs/windows with the same user ID to see real-time sync.
-      </p>
-      <p class="font-medium">Current User ID: {selectedId}</p>
     </div>
 
     <!-- Add offline status banner at top -->
