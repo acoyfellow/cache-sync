@@ -13,85 +13,97 @@ type Env = {
 
 export class UserProfileCache extends Server<Env> {
   private storage: DurableObjectStorage
-  private syncInterval: number = 5000 // 5 seconds
+  private readonly SYNC_INTERVAL = 60_000 // 60 seconds in ms
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env)
     this.storage = state.storage
+    state.blockConcurrencyWhile(this.initialize())
+  }
 
-    // Setup periodic sync
-    this.setupSync()
+  private initialize = async () => {
+    await this.processPendingUpdates()
   }
 
   async onConnect(conn: Connection) {
-    // Send initial profile data
-    const profile = await this.storage.get(conn.id)
-    if (profile) {
-      conn.send(JSON.stringify({ type: 'profile', data: profile }))
-    }
+    conn.send(JSON.stringify({
+      type: 'profile',
+      data: await this.getProfile(conn.id)
+    }))
   }
 
   async onMessage(conn: Connection, message: string) {
-    const data = JSON.parse(message)
+    const { type, profile, userId } = JSON.parse(message)
 
-    switch (data.type) {
+    switch (type) {
       case 'update_profile':
-        await this.handleProfileUpdate(conn, data.profile)
+        await this.cacheAndQueueUpdate(profile)
         break
+
       case 'get_profile':
-        await this.handleGetProfile(conn, data.userId)
+        conn.send(JSON.stringify({
+          type: 'profile',
+          data: await this.getProfile(userId)
+        }))
         break
     }
   }
 
-  private async handleProfileUpdate(conn: Connection, profile: UserProfile) {
-    // Update cache immediately
+  private async getProfile(userId: string): Promise<UserProfile> {
+    return (await this.storage.get(userId)) ?? this.createStubProfile(userId)
+  }
+
+  private createStubProfile(userId: string): UserProfile {
+    return {
+      id: userId,
+      data: { name: 'New User', email: '' },
+      lastUpdated: Date.now()
+    }
+  }
+
+  private async cacheAndQueueUpdate(profile: UserProfile) {
+    // Store update in pending queue
+    await this.storage.put(`pending_${Date.now()}`, profile)
+
+    // Update live cache immediately
     await this.storage.put(profile.id, {
       ...profile,
       lastUpdated: Date.now()
     })
 
-    // Broadcast to all connected clients
+    // Schedule sync if needed
+    if (!(await this.storage.getAlarm())) {
+      await this.storage.setAlarm(Date.now() + this.SYNC_INTERVAL)
+    }
+
     this.broadcast(JSON.stringify({
       type: 'profile_updated',
       profile
     }))
   }
 
-  private async handleGetProfile(conn: Connection, userId: string) {
-    // Try to get profile from DO cache
-    let profile = await this.storage.get(userId)
-
-    if (!profile) {
-      // In a real implementation, you would fetch from your main database here
-      // For now, we'll create a dummy profile
-      profile = {
-        id: userId,
-        data: {
-          name: 'New User',
-          email: '',
-          // other profile fields...
-        },
-        lastUpdated: Date.now()
-      }
-
-      // Cache it in DO
-      await this.storage.put(userId, profile)
-    }
-
-    // Send profile to requesting client
-    conn.send(JSON.stringify({
-      type: 'profile',
-      data: profile
-    }))
+  async alarm() {
+    await this.processPendingUpdates()
   }
 
-  private setupSync() {
-    setInterval(async () => {
-      const updates = await this.storage.list({ prefix: 'pending_' })
-      // Sync to main database
-      // Remove 'pending_' prefix after successful sync
-    }, this.syncInterval)
+  private async processPendingUpdates() {
+    const pendingUpdates = await this.storage.list({ prefix: 'pending_' })
+
+    if (pendingUpdates.size > 0) {
+      // Simulate DB sync delay
+      await new Promise(r => setTimeout(r, 500))
+      // TODO: Implement actual DB sync with MAIN_DB_API
+
+      // Clear processed updates
+      await Promise.all(
+        [...pendingUpdates.keys()].map(key => this.storage.delete(key))
+      )
+    }
+
+    // Reschedule if more updates exist
+    if ((await this.storage.list({ prefix: 'pending_' })).size > 0) {
+      await this.storage.setAlarm(Date.now() + this.SYNC_INTERVAL)
+    }
   }
 }
 

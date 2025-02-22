@@ -10,7 +10,7 @@
 
   let socket = new PartySocket({
     host: window.location.host,
-    room: selectedId,
+    room: userId,
     party: "user-profile-cache",
   });
 
