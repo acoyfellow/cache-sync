@@ -96,10 +96,10 @@ Offline → Local Storage → Auto Retry
 ```
 
 **Features**:
-- 📶 Network detection
-- 💾 Local persistence
-- 🔄 Auto-retry on reconnect
-- ♿ Accessible status
+- Network detection
+- Local persistence
+- Auto-retry on reconnect
+- Accessible status
 
 This implements a robust offline-first pattern where:
 - All user interactions remain available offline
