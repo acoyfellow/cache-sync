@@ -50,7 +50,17 @@ export class UserProfileCache extends Server<Env> {
   }
 
   private async getProfile(userId: string): Promise<UserProfile> {
-    return (await this.storage.get(userId)) ?? this.createStubProfile(userId)
+    // Simulate cache miss -> DB fallback pattern
+    let profile = await this.storage.get<UserProfile>(userId);
+
+    if (!profile) {
+      // Mock database fetch delay
+      await new Promise(r => setTimeout(r, 50));
+      profile = this.createStubProfile(userId);
+      console.log(`📦 Cache miss for ${userId}, created stub`);
+    }
+
+    return profile;
   }
 
   private createStubProfile(userId: string): UserProfile {
@@ -62,6 +72,13 @@ export class UserProfileCache extends Server<Env> {
   }
 
   private async cacheAndQueueUpdate(profile: UserProfile) {
+    // Simulate version conflict check
+    const current = await this.storage.get<UserProfile>(profile.id);
+    if (current && current.lastUpdated > profile.lastUpdated) {
+      console.log(`⚡ Version conflict for ${profile.id}`);
+      throw new Error('Version conflict - please refresh');
+    }
+
     // Store update in pending queue
     await this.storage.put(`pending_${Date.now()}`, profile)
 
@@ -87,12 +104,20 @@ export class UserProfileCache extends Server<Env> {
   }
 
   private async processPendingUpdates() {
-    const pendingUpdates = await this.storage.list({ prefix: 'pending_' })
+    const pendingUpdates = await this.storage.list({ prefix: 'pending_' });
 
     if (pendingUpdates.size > 0) {
-      // Simulate DB sync delay
-      await new Promise(r => setTimeout(r, 500))
-      // TODO: Implement actual DB sync with MAIN_DB_API
+      console.log(`🔄 Syncing ${pendingUpdates.size} updates (mock DB call)`);
+
+      // Simulate occasional sync failures
+      if (Math.random() < 0.2) { // 20% failure rate
+        console.error('❌ Mock DB sync failed - retrying later');
+        throw new Error('Mock DB failure');
+      }
+
+      // Simulate successful sync
+      await new Promise(r => setTimeout(r, 500));
+      console.log('✅ Mock database sync completed');
 
       // Clear processed updates
       await Promise.all(

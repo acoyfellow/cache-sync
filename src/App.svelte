@@ -14,7 +14,11 @@
     party: "user-profile-cache",
   });
 
-  let profile = $state(null);
+  let offlineQueue = $state<Array<Partial<typeof profile>>>([]);
+  let isOnline = $state(navigator.onLine);
+  let persistedProfile = localStorage.getItem(`profile-${selectedId}`);
+  let profile = $state(persistedProfile ? JSON.parse(persistedProfile) : null);
+
   let connecting = $state(true);
 
   $effect(() => {
@@ -49,6 +53,43 @@
     });
   });
 
+  // Add network status listeners
+  $effect(() => {
+    const updateOnlineStatus = () => (isOnline = navigator.onLine);
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
+    return () => {
+      window.removeEventListener("online", updateOnlineStatus);
+      window.removeEventListener("offline", updateOnlineStatus);
+    };
+  });
+
+  // Add auto-sync when coming online
+  $effect(() => {
+    if (isOnline && offlineQueue.length > 0) {
+      offlineQueue.forEach((update) => {
+        socket.send(
+          JSON.stringify({
+            type: "update_profile",
+            profile: { ...profile, ...update },
+          }),
+        );
+      });
+      offlineQueue = [];
+    }
+  });
+
+  // Add localStorage persistence
+  $effect(() => {
+    if (profile) {
+      localStorage.setItem(`profile-${selectedId}`, JSON.stringify(profile));
+      localStorage.setItem(
+        `offline-queue-${selectedId}`,
+        JSON.stringify(offlineQueue),
+      );
+    }
+  });
+
   function handleMessage(event: MessageEvent) {
     const data = JSON.parse(event.data);
 
@@ -63,12 +104,17 @@
   }
 
   function updateProfile(updates: Partial<typeof profile>) {
-    socket.send(
-      JSON.stringify({
-        type: "update_profile",
-        profile: { ...profile, ...updates },
-      }),
-    );
+    if (isOnline) {
+      socket.send(
+        JSON.stringify({
+          type: "update_profile",
+          profile: { ...profile, ...updates },
+        }),
+      );
+    } else {
+      offlineQueue = [...offlineQueue, updates];
+      profile = { ...profile, ...updates };
+    }
   }
 </script>
 
@@ -164,8 +210,10 @@
                 ...profile,
                 lastUpdated: new Date().toISOString(),
               })}
+            aria-disabled={!profile}
+            disabled={!profile}
           >
-            Update Profile
+            {isOnline ? "Update Profile" : "Save Locally (Offline)"}
           </button>
 
           <p class="text-sm text-neutral-500">
@@ -182,6 +230,15 @@
         Open multiple tabs/windows with the same user ID to see real-time sync.
       </p>
       <p class="font-medium">Current User ID: {selectedId}</p>
+    </div>
+
+    <!-- Add offline status banner at top -->
+    <div role="status" aria-live="polite">
+      {#if !isOnline}
+        <div class="bg-red-100 p-2 text-center text-sm text-red-800">
+          ⚡ Offline - Changes will sync when connection resumes
+        </div>
+      {/if}
     </div>
   </div>
 </main>

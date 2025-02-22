@@ -25,7 +25,7 @@ A production-ready pattern for high-traffic applications needing low-latency rea
 - **Auto Refresh**: Stale-while-revalidate pattern
 - **Pass-through Worker**: Simple edge routing
 
-## Cost Comparison (1M Requests/Month)
+## Napkin Math Cost Comparison (1M Requests/Month)
 
 | Resource          | Traditional DB      | Cache Sync Pattern  |
 |-------------------|---------------------|---------------------|
@@ -36,35 +36,42 @@ A production-ready pattern for high-traffic applications needing low-latency rea
 
 ## Getting Started
 
-1. **Deploy to Cloudflare**:
+1. **Clone and install**:
 ```bash
-npm install
-npx wrangler deploy
+git clone https://github.com/acoyfellow/cache-sync.git
+cd cache-sync
+bun install
 ```
 
-2. **Configure environment** (`wrangler.toml`):
-```toml
-name = "cache-sync-pattern"
-main = "src/worker.ts"
-compatibility_date = "2024-03-01"
-
-[[durable_objects.bindings]]
-name = "SESSION_CACHE"
-class_name = "CacheDO"
-
-[vars]
-MAIN_DB_API = "https://your-db-api.com"
-```
-
-3. **Usage Example**:
-```javascript
-// Check session validity
-async function validateSession(sessionId) {
-  const response = await fetch(
-    `https://your-worker.dev/session?id=\${sessionId}`
-  );
-  return await response.json();
+2. **Configure environment** (`wrangler.json`):
+```json
+{
+  "name": "cache-sync-pattern",
+  "main": "src/worker.ts",
+  "compatibility_date": "2024-03-01",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SESSION_CACHE",
+        "class_name": "CacheDO"
+      }
+    ]
+  },
+  "vars": {
+    "MAIN_DB_API": "https://your-db-api.com"
+  }
 }
+```
+
+3. **Local development**:
+```bash
+bun run dev
+# Interact with App.svelte at http://localhost:5173
+```
+
+4. **Deploy to Cloudflare**:
+```bash
+bunx wrangler deploy
 ```
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/cache-sync)
