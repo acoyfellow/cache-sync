@@ -1,4 +1,5 @@
 import { Server, type Connection, routePartykitRequest } from "partyserver"
+import { DurableObjectNamespace, DurableObjectStorage, DurableObjectState } from "@cloudflare/workers-types"
 
 type UserProfile = {
   id: string
@@ -12,13 +13,15 @@ type Env = {
 }
 
 export class UserProfileCache extends Server<Env> {
+  declare broadcast: (message: string) => void;
+
   private storage: DurableObjectStorage
   private readonly SYNC_INTERVAL = 60_000 // 60 seconds in ms
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env)
     this.storage = state.storage
-    state.blockConcurrencyWhile(this.initialize())
+    state.blockConcurrencyWhile(() => this.initialize())
   }
 
   private initialize = async () => {
@@ -49,18 +52,24 @@ export class UserProfileCache extends Server<Env> {
     }
   }
 
+  // Shared compression utilities
+  private async compress(data: unknown): Promise<Uint8Array> {
+    const stream = new Blob([JSON.stringify(data)]).stream()
+      .pipeThrough(new CompressionStream('gzip'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  private async decompress(buffer: Uint8Array): Promise<unknown> {
+    const stream = new Blob([buffer]).stream()
+      .pipeThrough(new DecompressionStream('gzip'));
+    return JSON.parse(await new Response(stream).text());
+  }
+
   private async getProfile(userId: string): Promise<UserProfile> {
-    // Simulate cache miss -> DB fallback pattern
-    let profile = await this.storage.get<UserProfile>(userId);
+    const buffer = await this.storage.get<Uint8Array>(userId);
+    const profile = buffer ? await this.decompress(buffer) as UserProfile : null;
 
-    if (!profile) {
-      // Mock database fetch delay
-      await new Promise(r => setTimeout(r, 50));
-      profile = this.createStubProfile(userId);
-      console.log(`📦 Cache miss for ${userId}, created stub`);
-    }
-
-    return profile;
+    return profile ?? this.createStubProfile(userId);
   }
 
   private createStubProfile(userId: string): UserProfile {
@@ -72,31 +81,24 @@ export class UserProfileCache extends Server<Env> {
   }
 
   private async cacheAndQueueUpdate(profile: UserProfile) {
-    // Simulate version conflict check
-    const current = await this.storage.get<UserProfile>(profile.id);
-    if (current && current.lastUpdated > profile.lastUpdated) {
-      console.log(`⚡ Version conflict for ${profile.id}`);
-      throw new Error('Version conflict - please refresh');
-    }
+    // Store compressed version in main cache
+    await this.storage.put(profile.id, await this.compress(profile));
 
-    // Store update in pending queue
-    await this.storage.put(`pending_${Date.now()}`, profile)
-
-    // Update live cache immediately
-    await this.storage.put(profile.id, {
+    // Store uncompressed version in pending queue for DB sync
+    await this.storage.put(`pending_${Date.now()}`, {
       ...profile,
       lastUpdated: Date.now()
-    })
+    });
 
     // Schedule sync if needed
     if (!(await this.storage.getAlarm())) {
-      await this.storage.setAlarm(Date.now() + this.SYNC_INTERVAL)
+      await this.storage.setAlarm(Date.now() + this.SYNC_INTERVAL);
     }
 
     this.broadcast(JSON.stringify({
       type: 'profile_updated',
       profile
-    }))
+    }));
   }
 
   async alarm() {

@@ -90,6 +90,22 @@ Client → Durable Object Cache → In-Memory Buffer
                                ↳ Alarm → Batch DB Write
 ```
 
+3. **Client Sync**:
+```plaintext
+Offline → Local Storage → Auto Retry
+```
+
+**Features**:
+- 📶 Network detection
+- 💾 Local persistence
+- 🔄 Auto-retry on reconnect
+- ♿ Accessible status
+
+This implements a robust offline-first pattern where:
+- All user interactions remain available offline
+- Changes queue locally until connectivity resumes
+- UI clearly indicates sync status
+- Data automatically reconciles when back online
 
 ## Implementation Phases:
   1. Shadow Mode: Run cache layer parallel to main API, compare results

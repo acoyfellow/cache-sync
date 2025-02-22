@@ -16,7 +16,7 @@
 
   let offlineQueue = $state<Array<Partial<typeof profile>>>([]);
   let isOnline = $state(navigator.onLine);
-  let persistedProfile = localStorage.getItem(`profile-${selectedId}`);
+  let persistedProfile = localStorage.getItem(`profile-${userId}`);
   let profile = $state(persistedProfile ? JSON.parse(persistedProfile) : null);
 
   let connecting = $state(true);

@@ -11,20 +11,20 @@
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^0.0.8",
-    "@cloudflare/workers-types": "^4.20250204.0",
+    "@cloudflare/vite-plugin": "^0.1.1",
+    "@cloudflare/workers-types": "^4.20250214.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@tsconfig/svelte": "^5.0.4",
-    "svelte": "^5.20.0",
+    "svelte": "^5.20.2",
     "svelte-check": "^4.1.4",
-    "typescript": "~5.7.2",
-    "vite": "^6.1.0",
+    "typescript": "~5.7.3",
+    "vite": "^6.1.1",
     "wrangler": "^3.109.2"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.0.7",
+    "@tailwindcss/vite": "^4.0.8",
     "partyserver": "^0.0.64",
     "partysocket": "^1.0.3",
-    "tailwindcss": "^4.0.7"
+    "tailwindcss": "^4.0.8"
   }
 }
