@@ -90,13 +90,36 @@ Client → Durable Object Cache → In-Memory Buffer
                                ↳ Alarm → Batch DB Write
 ```
 
-## Performance Benchmarks
 
-| Metric               | Direct DB Access | Cache Sync Pattern |
-|----------------------|------------------|--------------------|
-| Read Latency (p95)   | 150-300ms        | 2-5ms              |
-| Write Throughput     | 100 ops/s        | 10,000 ops/s       |
-| Availability         | 99.9%            | 99.99%             |
+## Implementation Phases:
+  1. Shadow Mode: Run cache layer parallel to main API, compare results
+  
+  2. Read-Only Canary: Route 5% of read traffic through cache
+  
+  3. Write Queueing: Enable write buffering for canary users
+  
+  4. Full Cutover: Gradually increase traffic over 1-2 weeks
+  
+This maintains security while allowing gradual rollout. The key is keeping the cache layer as a transparent proxy that enforces existing auth rules.
+
+
+## Furure Concerns
+
+  1) Data Compression
+    - Why? So we can store more data in the local DO state.
+
+  2) TTL Expiration
+    - Why? So we can expire data that is no longer needed.
+
+  3) Rate Limiting
+    - Why? So we can prevent abuse.
+
+  4) Authentication
+    - Why? So we can authenticate requests.
+
+  5) Monitoring & Observability
+    - Why? So we can monitor the performance of the cache.
+
 
 ## License
 
