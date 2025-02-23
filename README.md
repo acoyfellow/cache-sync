@@ -122,7 +122,7 @@ This maintains security while allowing gradual rollout. The key is keeping the c
 ## Future Concerns
 
 - [x] **Data Compression** - Store more data in Durable Object state  
-- [ ] **TTL Expiration** - Automatically expire stale data
+- [x] **TTL Expiration** - Automatically expire stale data
 - [ ] **Rate Limiting** - Prevent API abuse
 - [ ] **Auth Integration** - Add request validation
 - [ ] **Metrics Dashboard** - Track cache performance

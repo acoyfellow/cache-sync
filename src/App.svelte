@@ -153,7 +153,7 @@
         <h1
           class="text-2xl md:text-3xl font-bold flex items-center gap-2 justify-between"
         >
-          <a href="/">🔄</a>
+          <a href="/" class="hover:rotate-90 transition-transform">🔄</a>
           <span>Cache & Sync</span>
         </h1>
         <a
@@ -279,7 +279,7 @@
     >
       <h2 class="text-lg font-semibold mb-4">Demo:</h2>
 
-      <div class="flex gap-3 pb-6">
+      <div class="flex gap-3 pb-6 flex-col md:flex-row">
         {#each demoIds as id}
           <button
             class="px-5 py-2.5 rounded-lg border hover:-translate-y-0.5 hover:shadow cursor-pointer transition-all {selectedId ===
