@@ -52,8 +52,8 @@ bun install
   "durable_objects": {
     "bindings": [
       {
-        "name": "SESSION_CACHE",
-        "class_name": "CacheDO"
+        "name": "userprofile",
+        "class_name": "UserProfileCache"
       }
     ]
   },
