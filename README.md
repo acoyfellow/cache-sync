@@ -75,7 +75,7 @@ bunx wrangler deploy
 ```
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/cache-sync)
-
+ 
 ## How It Works
 
 1. **Read Path**:
